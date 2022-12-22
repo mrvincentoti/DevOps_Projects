@@ -8,22 +8,23 @@
 
 #### 🧾 Prerequisites
 
-<ul>
+<ul style="text-decoration: none;">
   <li>
-    <p> :palm_tree: Oracle VM Virtualbox </p>
+    <p> :palm_tree: Install Oracle VM Virtualbox </p>
   </li>
   <li>
-    <p> :palm_tree: Vagrant </p>
+    <p> :palm_tree: Install Vagrant </p>
   </li>
   <li>
-    <p> :palm_tree: Vagrant plugins </p>
+    <p> :palm_tree: Install Vagrant plugins </p>
     <ul>
         <li>vagrant plugin install vagrant-hostmanager</li>
         <li>vagrant plugin install vagrant-vbguest</li>
     </ul>
   </li>
   <li>
-    <p> :palm_tree: Git bash or equivalent editor </p>
+    <p> :palm_tree: Install Git bash or equivalent editor </p>
   </li>
 
 </ul>
+#### 🧾 Step 1 - Setup Virtual Machines
