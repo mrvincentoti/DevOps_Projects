@@ -114,8 +114,7 @@ Here's why:
 - Clone repository
 
   ```sh
-  git clone https://github.com/rumeysakdogan/vprofile-project.git
-
+  git clone https://github.com/devopshydclub/vprofile-project
   ```
 
 - Navigate to the directory where the Vagrantfile exists
