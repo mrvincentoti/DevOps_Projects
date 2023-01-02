@@ -241,59 +241,44 @@ aws s3 cp target/vprofile-v2.war s3://vprofile-artifact-storage-30122022
 aws s3 ls s3://vprofile-artifact-storage-30122022
 ```
 
-#### 8 - Create an IAM for s3 bucket.
+#### 6 - Download artifact from s3
 
-#### 9 - Download artifact from s3
-
-i. connect to the tomcat server
+Before we can download artifact from s3 in our instance we need to create an IAM Role and attach it to our application server app01
 
 ```
-ssh -i "your-key.pem" ubuntu@your_instance_public_ip
+Type: EC2
+Name: vprofile-artifact-storage-role
+Policy: s3FullAccess
 ```
 
-ii. Navigate to tomcat server
+Before we login to our server, we need to open port 22 on our vprofile-app-SG
+
+- connect to the tomcat server
 
 ```
-cd /var/lib/tomcat8/webapps
+ssh -i "vprofile-prod-key.pem" ubuntu@<public_ip_of_server>
+sudo su -
+systemctl status tomcat8
 ```
 
-iii Stop tomcat server
+- We will delete ROOT (where default tomcat app files are stored) directory under /var/lib/tomcat8/webapps/.
 
 ```
+cd /var/lib/tomcat8/webapps/
 systemctl stop tomcat8
-```
-
-iv Remove default tomcat page
-
-```
 rm -rf ROOT
 ```
 
-v. Install aws cli
+- Next we will download our artifact from s3 using aws cli commands. We will need to install aws cli.
 
 ```
 apt install awscli -y
-```
-
-vi Copy artifact from s3
-
-```
- aws s3 cp s3://vprofile-artifact-storage-30122022/vprofile-v2.war /tmp/vprofile-v2.war
-```
-
-vii Copy artifact to tomcat server
-
-```
- cp /tmp/vprofile-v2.war /var/lib/tomcat8/webapps/ROOT.war
-```
-
-viii Start tomcat
-
-```
+aws s3 cp s3://vprofile-artifact-storage-30122022/vprofile-v2.war /tmp/vprofile-v2.war
+cp /tmp/vprofile-v2.war /var/lib/tomcat8/webapps/ROOT.war
 systemctl start tomcat8
 ```
 
-#### 10 - Setup LoadBalancer
+#### 7 - Setup LoadBalancer
 
 - Create target group
 
@@ -328,6 +313,7 @@ Value: your_elb_arn
 ```
 
 - Lets check our application using our DNS. We can securely connect to our application!
+  ![](screenshoot/application-loaded-with-domian-name.png)
 
 #### 11 - Configure AutoScaling Group for Application Instances
 
@@ -376,51 +362,3 @@ Use this space to list resources you find helpful and would like to give credit 
 - [Imran](https://github.com/devopshydclub)
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
-
-<!-- MARKDOWN LINKS & screenshoot -->
-<!-- https://www.markdownguide.org/basic-syntax/#reference-style-links -->
-
-[contributors-shield]: https://img.shields.io/github/contributors/othneildrew/Best-README-Template.svg?style=for-the-badge
-[contributors-url]: https://github.com/othneildrew/Best-README-Template/graphs/contributors
-[forks-shield]: https://img.shields.io/github/forks/othneildrew/Best-README-Template.svg?style=for-the-badge
-[forks-url]: https://github.com/othneildrew/Best-README-Template/network/members
-[stars-shield]: https://img.shields.io/github/stars/othneildrew/Best-README-Template.svg?style=for-the-badge
-[stars-url]: https://github.com/othneildrew/Best-README-Template/stargazers
-[issues-shield]: https://img.shields.io/github/issues/othneildrew/Best-README-Template.svg?style=for-the-badge
-[issues-url]: https://github.com/othneildrew/Best-README-Template/issues
-[license-shield]: https://img.shields.io/github/license/othneildrew/Best-README-Template.svg?style=for-the-badge
-[license-url]: https://github.com/othneildrew/Best-README-Template/blob/master/LICENSE.txt
-[linkedin-shield]: https://img.shields.io/badge/-LinkedIn-black.svg?style=for-the-badge&logo=linkedin&colorB=555
-[linkedin-url]: https://linkedin.com/in/othneildrew
-[product-screenshot]: screenshoot/screenshot.png
-[vms-are-running-in-virtualbox]: screenshoot/VMs-are-running-in-VirtualBox.png
-[host-files-output]: screenshoot/connected-web01-via-ssh.png
-[ping-output]: screenshoot/pinging-app01-from-web01.png
-[next.js]: https://img.shields.io/badge/next.js-000000?style=for-the-badge&logo=nextdotjs&logoColor=white
-[next-url]: https://nextjs.org/
-[react.js]: https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB
-[react-url]: https://reactjs.org/
-[vue.js]: https://img.shields.io/badge/Vue.js-35495E?style=for-the-badge&logo=vuedotjs&logoColor=4FC08D
-[vue-url]: https://vuejs.org/
-[angular.io]: https://img.shields.io/badge/Angular-DD0031?style=for-the-badge&logo=angular&logoColor=white
-[angular-url]: https://angular.io/
-[svelte.dev]: https://img.shields.io/badge/Svelte-4A4A55?style=for-the-badge&logo=svelte&logoColor=FF3E00
-[svelte-url]: https://svelte.dev/
-[laravel.com]: https://img.shields.io/badge/Laravel-FF2D20?style=for-the-badge&logo=laravel&logoColor=white
-[laravel-url]: https://laravel.com
-[bootstrap.com]: https://img.shields.io/badge/Bootstrap-563D7C?style=for-the-badge&logo=bootstrap&logoColor=white
-[bootstrap-url]: https://getbootstrap.com
-[jquery.com]: https://img.shields.io/badge/jQuery-0769AD?style=for-the-badge&logo=jquery&logoColor=white
-[jquery-url]: https://jquery.com
-[vagrant]: https://img.shields.io/badge/Vagrant-Vagrant-orange
-[virtualbox]: https://img.shields.io/badge/Virtualbox-Virtualbox-orange
-[nginx]: https://img.shields.io/badge/Nginx-Nginx-orange
-[tomcat]: https://img.shields.io/badge/tomcat-tomcat-orange
-[rabbitmq]: https://img.shields.io/badge/rabitmq-rabitmq-orange
-[memcache]: https://img.shields.io/badge/memcache-memcache-orange
-[mysql]: https://img.shields.io/badge/mysql-mysql-orange
-[bash_script]: https://img.shields.io/badge/bash-bash-black
-
-```
-
-```
