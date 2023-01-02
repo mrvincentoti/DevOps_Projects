@@ -81,13 +81,22 @@ A multi tier web application stack setup on a Laptop/Desktop, then using a lift 
 - Configure the certificate on your domain (I am using Godaddy)
 - Create security groups
 
+  Create vprofile-ELB-SG. Configure Inbound rules to Allow both HTTP and HTTPS on port 80 and 443 respectively from Anywhere IPv4 and IPv6.
+  ![](screenshoot/ELB-SecGrp.png)
+
+  Next we will create vprofile-app-SG. Open port 8080 to accept connections from vprofile-ELb-SG.
+  ![](screenshoot/App-SecGrp.png)
+
+  Finally, we will create vprofile-backend-SG. Open port 3306 for MySQL, 11211 for Memcached and 5672 for RabbitMQ server. We also need to open commucation AllTraffic within the vprofile-backend-SG to allow backend services to communicate with each other.
+  ![](screenshoot/Backend-SecGrp.png)
+
 - Create AWS Key Pair
 
   ![](screenshoot/create-key-pair.PNG)
 
 #### 2 - Launch EC2 Instances
 
-i. Launch MySQL Instance with these details
+i. Launch MySQL Instance with the details below. Open up port 22 on the vprofile-backend-SG to be able to connect to your instance for validation.
 
 - Name: vprofile-db01
 - Tag: Key - project, Value - vprofile
@@ -95,46 +104,15 @@ i. Launch MySQL Instance with these details
 - Instance type: t2micro
 - Key pair: vprofile-key-pair
 - Security Group: vprofile-backend-SG
-- Under advanced details add this in user data section
+- UserData: userdata/mysql.sh
+
+You can check the status of mariadb once instance is ready.
 
 ```
-#!/bin/bash
-DATABASE_PASS='admin123'
-sudo yum update -y
-sudo yum install epel-release -y
-sudo yum install git zip unzip -y
-sudo yum install mariadb-server -y
-
-
-# starting & enabling mariadb-server
-sudo systemctl start mariadb
-sudo systemctl enable mariadb
-cd /tmp/
-git clone -b vp-rem https://github.com/devopshydclub/vprofile-repo.git
-#restore the dump file for the application
-sudo mysqladmin -u root password "$DATABASE_PASS"
-sudo mysql -u root -p"$DATABASE_PASS" -e "UPDATE mysql.user SET Password=PASSWORD('$DATABASE_PASS') WHERE User='root'"
-sudo mysql -u root -p"$DATABASE_PASS" -e "DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1')"
-sudo mysql -u root -p"$DATABASE_PASS" -e "DELETE FROM mysql.user WHERE User=''"
-sudo mysql -u root -p"$DATABASE_PASS" -e "DELETE FROM mysql.db WHERE Db='test' OR Db='test\_%'"
-sudo mysql -u root -p"$DATABASE_PASS" -e "FLUSH PRIVILEGES"
-sudo mysql -u root -p"$DATABASE_PASS" -e "create database accounts"
-sudo mysql -u root -p"$DATABASE_PASS" -e "grant all privileges on accounts.* TO 'admin'@'localhost' identified by 'admin123'"
-sudo mysql -u root -p"$DATABASE_PASS" -e "grant all privileges on accounts.* TO 'admin'@'%' identified by 'admin123'"
-sudo mysql -u root -p"$DATABASE_PASS" accounts < /tmp/vprofile-repo/src/main/resources/db_backup.sql
-sudo mysql -u root -p"$DATABASE_PASS" -e "FLUSH PRIVILEGES"
-
-# Restart mariadb-server
-sudo systemctl restart mariadb
-
-
-#starting the firewall and allowing the mariadb to access from port no. 3306
-sudo systemctl start firewalld
-sudo systemctl enable firewalld
-sudo firewall-cmd --get-active-zones
-sudo firewall-cmd --zone=public --add-port=3306/tcp --permanent
-sudo firewall-cmd --reload
-sudo systemctl restart mariadb
+ssh -i vprofile-prod-key.pem centos@<public_ip_of_instance>
+sudo su -
+curl http://169.254.169.254/latest/user-data
+systemctl status mariadb
 ```
 
 ii. Launch Memcached Instance with these details
@@ -145,16 +123,16 @@ ii. Launch Memcached Instance with these details
 - Instance type: t2micro
 - Key pair: vprofile-key-pair
 - Security Group: vprofile-backend-SG
-- Under advanced details add this in user data section
+- UserData: userdata/memcached.sh
+
+You can check the status of memcache once instance is ready.
 
 ```
-#!/bin/bash
-sudo yum install epel-release -y
-sudo yum install memcached -y
-sudo systemctl start memcached
-sudo systemctl enable memcached
-sudo systemctl status memcached
-sudo memcached -p 11211 -U 11111 -u memcached -d
+ssh -i vprofile-prod-key.pem centos@<public_ip_of_instance>
+sudo su -
+curl http://169.254.169.254/latest/user-data
+systemctl status memcached.service
+ss -tunpl | grep 11211
 ```
 
 iii. Launch RabbitMQ Instance with these details
@@ -165,26 +143,15 @@ iii. Launch RabbitMQ Instance with these details
 - Instance type: t2micro
 - Key pair: vprofile-key-pair
 - Security Group: vprofile-backend-SG
-- Under advanced details add this in user data section
+- UserData: userdata/rabbit.sh
+
+You can check the status of rabbitq once instance is ready.
 
 ```
-#!/bin/bash
-sudo yum install epel-release -y
-sudo yum update -y
-sudo yum install wget -y
-cd /tmp/
-wget http://packages.erlang-solutions.com/erlang-solutions-2.0-1.noarch.rpm
-sudo rpm -Uvh erlang-solutions-2.0-1.noarch.rpm
-sudo yum -y install erlang socat
-curl -s https://packagecloud.io/install/repositories/rabbitmq/rabbitmq-server/script.rpm.sh | sudo bash
-sudo yum install rabbitmq-server -y
-sudo systemctl start rabbitmq-server
-sudo systemctl enable rabbitmq-server
-sudo systemctl status rabbitmq-server
-sudo sh -c 'echo "[{rabbit, [{loopback_users, []}]}]." > /etc/rabbitmq/rabbitmq.config'
-sudo rabbitmqctl add_user test test
-sudo rabbitmqctl set_user_tags test administrator
-sudo systemctl restart rabbitmq-server
+ssh -i vprofile-prod-key.pem centos@<public_ip_of_instance>
+sudo su -
+curl http://169.254.169.254/latest/user-data
+systemctl status rabbitmq-server
 ```
 
 iv. Launch Tomcat Instance with these details
@@ -195,54 +162,83 @@ iv. Launch Tomcat Instance with these details
 - Instance type: t2micro
 - Key pair: vprofile-key-pair
 - Security Group: vprofile-app-sg
-- Under advanced details add this in user data section
-
-```
-#!/bin/bash
-sudo apt update
-sudo apt upgrade -y
-sudo apt install openjdk-8-jdk -y
-sudo apt install tomcat8 tomcat8-admin tomcat8-docs tomcat8-common git -y
-```
+- UserData: tomcat_ubuntu.sh
 
 #### 3 - Configure backend IP in Route53
 
-1. Create hosted zone
+- Create hosted zone
 
-#### 4 - Build application artifact
+  Our backend stack is running. Next we will update Private IP of our backend services in Route53 Private DNS Zone.Lets note down Private IP addresses.
 
-```
-git clone https://github.com/devopshydclub/vprofile-project.git
-```
+  ```
+  rmq01 172.31.80.20
+  db01 172.31.22.178
+  mc01 172.31.87.132
+  ```
 
-```
-git checkout aws-LiftAndShift
-```
+- Create vprofile.in Private Hosted zone in Route53. we will pick Default VPC in N.Virginia region.
+  ![](screenshoot/route53-records.png)
 
-```
-cd src/main/resources
-```
+- Create records for our backend services. We will use these record names in our application.properties file. Even if IP address of the services changes, our application won't need to change the config file.
+  ![](screenshoot/backend-records.png)
 
-```
-vi application.properties
-```
-
-#### 5 - Update the host names as per route 53 configurations
-
-#### 6 - Build application artifact
+#### 4 - Build application artifact locally with Maven
 
 ```
-cd ../../../ && mv install
+git clone https://github.com/mrvincentoti/vprofile-project.git
 ```
 
-#### 7 - Create an s3 bucket and Copy the generated artifact to the s3 bucket.
+Before we create our artifact, we need to do changes to our application.properties file under `/src/main/resources` directory for below lines.
+
+```
+jdbc.url=jdbc:mysql://db01.vprofile.in:3306/accounts?useUnicode=true&
+
+memcached.active.host=mc01.vprofile.in
+
+rabbitmq.address=rmq01.vprofile.in
+```
+
+Go to vprofile-project root directory to the same level pom.xml exists and run below command to build application artifact (vprofile-v2.war)
+
+```
+mv install
+```
+
+#### 5 - Create an s3 bucket and Copy the generated artifact to the s3 bucket.
+
+- We will upload our artifact to s3 bucket from AWS CLI and our Tomcat server will get the same artifact from s3 bucket.
+
+- We will create an IAM user to allow us use AWS CLI to access resources.
+
+```
+name: vprofile-s3-admin
+Access key - Programmatic access
+Policy: s3FullAccess
+```
+
+![](screenshoot/iam-user.png)
+
+- Configure AWS CLI
+
+```
+aws configure
+AccessKeyID:
+SecretAccessKey:
+region: us-east-1
+format: json
+```
+
+Create bucket. Note: S3 buckets are global so the naming must be UNIQUE!
 
 ```
 aws s3 mb s3://vprofile-artifact-storage-30122022
 ```
 
+- Go to target directory and copy the artifact to bucket with below command. Then verify by listing objects in the bucket.
+
 ```
 aws s3 cp target/vprofile-v2.war s3://vprofile-artifact-storage-30122022
+aws s3 ls s3://vprofile-artifact-storage-30122022
 ```
 
 #### 8 - Create an IAM for s3 bucket.
