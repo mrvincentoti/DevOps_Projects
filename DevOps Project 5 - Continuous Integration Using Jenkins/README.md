@@ -323,3 +323,219 @@ echo "System reboot in 30 sec"
 sleep 30
 reboot
 ```
+
+#### 4 - Post Installation
+
+#### Jenkins Server
+
+- Connect to the jenkins machine, check jenkins status, and get initial password
+
+```
+sudo -i
+systemctl status jenkins
+cat /var/lib/jenkins/secrets/initialAdminPassword 
+```
+
+- Go to browser, http://<public_ip_of_jenkins_server>:8080, enter initialAdminPasswrd. Install the suggested plugins, and then create an admin user.
+
+<div align="center">
+  <a href="">
+    <img src="screenshoots/jenkins-server-up.PNG">
+  </a>
+</div>
+
+- Install below plugins for jenkins
+
+```
+Maven Integration
+Github Integration
+Nexus Artifact Uploader
+SonarQube Scanner
+Slack Notification
+Build Timestamp
+```
+
+#### Nexus Server
+
+- Connect to nexus server using SSH
+
+```
+sudo -i
+systemctl status nexus
+```
+
+- Go to browser, http://<public_ip_of_nexus_server>:8081 ,click sign-in. Initial password will be located at /opt/nexus/sonatype-work/nexus3/admin.password
+
+```
+cat /opt/nexus/sonatype-work/nexus3/admin.password
+```
+
+```
+Username: admin
+Password: `from previous step`
+```
+
+- Create a repository to store our release artifacts
+
+```
+maven2 hosted
+Name: vprofile-release
+Version policy: Release
+```
+
+- Next we will create a maven2 proxy repository. Maven will store the dependecies in this repository, whenever we need any dependency for our project it will check this proxy repo in Nexus first and download it for project. Proxy repo will download the dependecies from maven2 central repo at first.
+
+```
+maven2 proxy
+Name: vpro-maven-central
+remote storage: https://repo1.maven.org/maven2/
+```
+
+- This repo will be used to store our snapshot artifacts. That means any artifact with -SNAPSHOT extension will be stored in this repository.
+
+```
+maven2 hosted
+Name: vprofile-snapshot
+Version policy: Snapshot
+```
+
+- Create a maven2 group type repo. We will use this repo to group all maven repositories.
+
+```
+maven2 group
+Name: vpro-maven-group
+Member repositories: 
+ - vpro-maven-central
+ - vprofile-release
+ - vprofile-snapshot
+```
+
+<div align="center">
+  <a href="">
+    <img src="screenshoots/nexus-repository.PNG">
+  </a>
+</div>
+
+#### SonarQube Server
+
+- Go to browser, http://<public_ip_of_sonar_server>.
+- Login with username admin and password admin.
+- Change the password
+
+### 5 Create a repository in Github
+
+- Create a private repository in Github
+- Setup ssh key on github
+- Clone the repository
+
+```
+git clone -b ci-jenkins https://github.com/devopshydclub/vprofile-project.git .
+
+```
+
+### 6 Build Job With Nexus Repository
+- Our first job will be Build the Artifact from Source Code using Maven. We need JDK8 and Maven to be installed in jenkins to complete the job succesfully.
+
+- Since our application is using JDK8, we need to install Java8 in jenkins. `Manage Jenkins` -> `Global Tool Configuration` We will install JDK8 manually, and specify its PATH in here.
+
+```
+Under JDK -> Add JDK
+Name: OracleJDK8
+untick Install Automatically
+JAVA_HOME: < we will get after next step >
+```
+
+- Currently our jenkins has JDK-11 install, we can SSH into our jenkins server and install JDK-8. Then get the PATH to JDK-8 to replace in above step. So after installation we will see our JAVA_HOME for JDK-8 is /usr/lib/jvm/java-8-openjdk-amd64
+
+```
+sudo apt update -y
+sudo apt install openjdk-8-jdk -y
+sudo -i
+ls /usr/lib/jvm
+### we should get both jdk-11 and jdk-8 in this path ###
+java-1.11.0-openjdk-amd64  java-11-openjdk-amd64  openjdk-11
+java-1.8.0-openjdk-amd64   java-8-openjdk-amd64
+```
+
+- Setup maven
+
+```
+Name: MAVEN3
+version : keep same
+```
+- Next we need to add Nexus login credentials to Jenkins. Go to `Manage Jenkins` -> `Manage Credentials` -> `Global` -> `Add Credentials`
+
+```
+username: admin
+password: <pwd_setup_for_nexus>
+ID: nexuslogin
+description: nexuslogin
+```
+
+```
+We will create Jenkinsfile for Build pipeline as below. The variables mentioned in pom.xml repository part and settings.xml will be declared in Jenkinsfile with their values to be used during execution. Update Pipeline file and push to GitHub.
+```
+
+```
+pipeline {
+    agent any
+    tools {
+        maven "MAVEN3"
+        jdk "OracleJDK8"
+    }
+
+    environment {
+        SNAP_REPO = 'vprofile-snapshot'
+        NEXUS_USER = 'admin'
+        NEXUS_PASS = 'admin'
+        RELEASE_REPO = 'vprofile-release'
+        CENTRAL_REPO = 'vpro-maven-central'
+        NEXUSIP = '3.83.88.27'
+        NEXUSPORT = '8081'
+        NEXUS_GRP_REPO = 'vpro-maven-group'
+        NEXUS_LOGIN = 'nexuslogin'
+    }
+
+    stages {
+        stage('Build') {
+            steps {
+                sh 'mvn -s settings.xml -DskipTests install'
+            }
+        }
+    }
+}
+
+```
+
+- We will create a New Job in Jenkins with below properties:
+
+```
+Pipeline from SCM 
+Git
+URL: <url_from_project> I will use SSH link
+Crdentials: we will create github login credentials
+#### add Jenkins credentials for github ####
+Kind: SSH Username with private key
+ID: githublogin
+Description: githublogin
+Username: git
+Private key file: paste your private key here
+#####
+Branch: */ci-jenkins
+path: Jenkinsfile
+```
+
+- Error is not gone, we need to login jenkins server via SSH and complete host-key checking step. After below command, our host-key will be stored in .ssh/known_hosts file.Then error will be gone.
+
+```
+sudo -i
+sudo su - jenkins
+git ls-remote -h -- git@github.com:mrvincentoti/jenkins-ci-project.git HEAD
+```
+
+- Successful build
+<div align="center">
+  <a href="">
+    <img src="screenshoots/build-success.PNG">
+  </a>
+</div>
