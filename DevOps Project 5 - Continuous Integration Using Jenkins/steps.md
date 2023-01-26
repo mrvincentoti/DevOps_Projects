@@ -1,0 +1,19 @@
+### STEPS
+- Login to AWS Account
+- Create Key Pair
+- Create Security group
+    - Jenkins, Nexus & Sonarqube
+- Create EC2 Instance with userdata
+    - Jenkins, Nexus, & Sonarqube
+- Post installation
+    - Jenkins setup plugins
+    - Nexus setup & repository setup
+    - Sonarqube login test
+- Git
+    - Create a github repository & migrate code
+    - Integrate repository with vscode and test
+- Build job with nexus integration
+- Github webhook
+- Sonarqube server integration
+- Nexus artifact upload to nexus server
+- Slack notification
